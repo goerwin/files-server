@@ -1,56 +1,48 @@
-import { Hono } from "hono";
-import {
-	dirExists,
-	getRequiredEnvVars,
-	parsePath,
-	verifyPublicKey,
-} from "./helpers";
+import { Hono, type Context } from "hono";
+import { dirExists, getRequiredEnvVars, parsePath, verifyPublicKey } from "./helpers";
 
-const { DATABASES_FOLDER_PATH, PORT, SECRET_KEY } = getRequiredEnvVars([
+const { FILES_FOLDER_PATH, PORT, SECRET_KEY } = getRequiredEnvVars([
 	"PORT",
 	"SECRET_KEY",
-	"DATABASES_FOLDER_PATH",
+	"FILES_FOLDER_PATH",
 ]);
 
-if (!(await dirExists(parsePath(DATABASES_FOLDER_PATH)))) {
-	console.error("Db path does not exist. Path:", DATABASES_FOLDER_PATH);
+if (!(await dirExists(parsePath(FILES_FOLDER_PATH)))) {
+	console.error("Files path does not exist. Path:", FILES_FOLDER_PATH);
 	process.exit(1);
 }
 
 const app = new Hono();
 
-/**
- * Uploads the database file to the database folder path
- */
-app.post("/db/:userId/:dbName", async function dbHandler(c) {
+// Uploads the files to the users folder in the files folder
+app.post("/files/:username", filesHandler);
+
+// Uploads the files to the users' project folder in the files folder
+app.post("/files/:username/:project", filesHandler);
+
+async function filesHandler(c: Context) {
 	const maxFileSize = 10 * 1024 * 1024; // 10 MB
-	const { userId, dbName } = c.req.param();
-	const dbFileName = `${userId}-${dbName}`.trim();
+	const { username, project = "" } = c.req.param();
 	const body = await c.req.parseBody();
 	const file = body.file;
 
-  console.log('authorization', c.req.header("authorization"));
 	const pbKey = c.req.header("authorization")?.replace("PublicKey ", "");
-
 	if (!pbKey) return c.json({ ok: false, error: "No public key" }, 401);
 
 	const verifiedUserId = verifyPublicKey(pbKey, SECRET_KEY);
-
-	if (verifiedUserId !== userId)
-		return c.json({ ok: false, error: "Invalid public key" }, 401);
-
-	if (!(file instanceof File))
-		return c.json({ ok: false, error: "file is required" }, 400);
+	if (verifiedUserId !== username) return c.json({ ok: false, error: "Invalid public key" }, 401);
+	if (!(file instanceof File)) return c.json({ ok: false, error: "file is required" }, 400);
 
 	if (file.size > maxFileSize) {
 		const msg = `file too big. Max: ${maxFileSize} Bytes. Received: ${file.size}`;
 		return c.json({ ok: false, error: msg }, 413);
 	}
 
-	await Bun.write(parsePath(DATABASES_FOLDER_PATH, dbFileName), file);
-
-	return c.json({ ok: true, name: dbFileName });
-});
+	const fileName = body.name && typeof body.name === "string" ? body.name : file.name;
+	const relativeFilePath = parsePath(username, project, fileName);
+	await Bun.write(parsePath(FILES_FOLDER_PATH, relativeFilePath), file);
+	return c.json({ ok: true, path: relativeFilePath });
+}
 
 //
 // Starts the server
