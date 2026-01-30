@@ -1,5 +1,5 @@
 {
-	"name": "database-server",
+	"name": "files-server",
 	"private": true,
 	"type": "module",
 	"module": "index.ts",

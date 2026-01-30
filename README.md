@@ -1,6 +1,6 @@
-# database-server
+# files-server
 
-A small HTTP server that accepts **database file uploads** over POST, authenticated with a **public key** (HMAC-signed token). Uploaded files are stored under a configurable folder; keys are generated and verified using a shared server secret.
+A small HTTP server that accepts **file uploads** over POST, authenticated with a **public key** (HMAC-signed token). Uploaded files are stored under a configurable folder; keys are generated and verified using a server secret.
 
 ## Prerequisites
 
@@ -14,48 +14,59 @@ bun install
 
 Create a `.env` file in the project root with:
 
-| Variable                | Description                                                              |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `PORT`                  | Server port (e.g. `3000`)                                                |
-| `SECRET_KEY`            | Secret used to sign and verify public keys (keep private)                |
-| `DATABASES_FOLDER_PATH` | Directory where uploaded DB files are stored (supports `~` for home dir) |
+| Variable            | Description                                                           |
+| ------------------- | --------------------------------------------------------------------- |
+| `PORT`              | Server port (e.g. `3000`)                                             |
+| `SECRET_KEY`        | Secret used to sign and verify public keys (keep private)             |
+| `FILES_FOLDER_PATH` | Directory where uploaded files are stored (supports `~` for home dir) |
 
-The server will not start if any of these are missing. The database folder path must already exist.
+The server will not start if any of these environment variables are not available at runtime.
+The files folder path must already exist.
 
 ## Running the server
 
 ```bash
 bun run start
-```
 
-With file watching during development:
-
-```bash
+# Or with file watching during development:
 bun run dev
 ```
 
 ## API
 
-### `POST /db/:userId/:dbName`
+### `POST /files/:username`
 
-Uploads a database file for the given `userId` and `dbName`.
+Uploads one or more files for `username` into that user’s folder.
 
-- **Authentication:** `Authorization: PublicKey <key>` header. The key must be generated for the same `userId` as in the URL (see [Public keys](#public-keys)).
-- **Body:** multipart form with a `file` field containing the database file.
-- **Limits:** max file size 10 MB.
-- **Storage:** file is saved under `DATABASES_FOLDER_PATH` as `{userId}-{dbName}`.
+### `POST /files/:username/:folder`
+
+Uploads one or more files for `username` into the user’s `folder` subfolder.
+
+- **Authentication:** `Authorization: PublicKey <key>` header. The key must be generated for the same `username` as in the URL (see [Public keys](#public-keys)).
+- **Body:** multipart form with one or more `files` fields.
+- **Limits:** 1–10 files per request, max file size 10 MB per file.
+- **Storage:** files are saved under `FILES_FOLDER_PATH` as `{username}/{folder?}/{filename}`.
 
 **Example**
 
 ```bash
-curl -X POST "http://localhost:3000/db/alice/myapp.db" \
+curl -X POST "http://localhost:3000/files/alice/myfolder" \
   -H "Authorization: PublicKey alice.<signature>" \
-  -F "file=@/path/to/myapp.db"
+  -F "files=@/path/to/file1.txt" \
+  -F "files=@/path/to/file2.txt"
+```
+
+To set a custom filename at upload time, use curl’s `filename=` parameter (this becomes `file.name` on the server):
+
+```bash
+curl -X POST "http://localhost:3000/files/alice/myfolder" \
+  -H "Authorization: PublicKey alice.<signature>" \
+  -F "files=@/path/to/local.db;filename=production.db"
 ```
 
 ## Public keys
 
-Keys are **userId + HMAC-SHA256 signature** (base64url). They are not secret; they prove that the server issued the key for that user.
+Keys are **username + HMAC-SHA256 signature** (base64url). They are not secret; they prove that the server issued the key for that username.
 
 ### Generate a key (CLI)
 

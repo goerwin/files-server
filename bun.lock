@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "database-server",
+      "name": "files-server",
       "dependencies": {
         "hono": "^4.11.7",
       },

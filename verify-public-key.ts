@@ -9,11 +9,11 @@ if (!pbKey) {
 	process.exit(1);
 }
 
-const userId = verifyPublicKey(pbKey, SECRET_KEY);
+const username = verifyPublicKey(pbKey, SECRET_KEY);
 
-if (!userId) {
+if (!username) {
 	console.error("Invalid key!");
 	process.exit(1);
 }
 
-console.log(`Valid key for user: ${userId}`);
+console.log(`Valid key for user: ${username}`);

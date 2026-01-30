@@ -1,4 +1,4 @@
-import { Hono, type Context } from "hono";
+import { type Context, Hono } from "hono";
 import { dirExists, getRequiredEnvVars, parsePath, verifyPublicKey } from "./helpers";
 
 const { FILES_FOLDER_PATH, PORT, SECRET_KEY } = getRequiredEnvVars([
@@ -14,34 +14,45 @@ if (!(await dirExists(parsePath(FILES_FOLDER_PATH)))) {
 
 const app = new Hono();
 
-// Uploads the files to the users folder in the files folder
+// Uploads the files to the users' [username] folder in the files folder
 app.post("/files/:username", filesHandler);
 
-// Uploads the files to the users' project folder in the files folder
-app.post("/files/:username/:project", filesHandler);
+// Uploads the files to the users' [username/folder] folder in the files folder
+app.post("/files/:username/:folder", filesHandler);
 
+/**
+ * Handles file uploads for authenticated users.
+ * Accepts between 1 and 10 files per request, up to 10 MB per file.
+ */
 async function filesHandler(c: Context) {
 	const maxFileSize = 10 * 1024 * 1024; // 10 MB
-	const { username, project = "" } = c.req.param();
-	const body = await c.req.parseBody();
-	const file = body.file;
+	const { username, folder = "" } = c.req.param();
 
 	const pbKey = c.req.header("authorization")?.replace("PublicKey ", "");
 	if (!pbKey) return c.json({ ok: false, error: "No public key" }, 401);
 
 	const verifiedUserId = verifyPublicKey(pbKey, SECRET_KEY);
 	if (verifiedUserId !== username) return c.json({ ok: false, error: "Invalid public key" }, 401);
-	if (!(file instanceof File)) return c.json({ ok: false, error: "file is required" }, 400);
 
-	if (file.size > maxFileSize) {
-		const msg = `file too big. Max: ${maxFileSize} Bytes. Received: ${file.size}`;
-		return c.json({ ok: false, error: msg }, 413);
+	const reqFiles = (await c.req.formData()).getAll("files");
+	const files = reqFiles.filter((f) => f instanceof File);
+
+	if (files.length === 0 || files.length > 10) {
+		return c.json({ ok: false, error: "Between 1 and 10 files are required" }, 400);
 	}
 
-	const fileName = body.name && typeof body.name === "string" ? body.name : file.name;
-	const relativeFilePath = parsePath(username, project, fileName);
-	await Bun.write(parsePath(FILES_FOLDER_PATH, relativeFilePath), file);
-	return c.json({ ok: true, path: relativeFilePath });
+	if (files.some((file) => file.size > maxFileSize)) {
+		return c.json({ ok: false, error: `A file is too large. Max: ${maxFileSize} Bytes.` }, 413);
+	}
+
+	const results: { path: string; name: string }[] = [];
+	for (const file of files) {
+		const relativeFilePath = parsePath(username, folder, file.name);
+		await Bun.write(parsePath(FILES_FOLDER_PATH, relativeFilePath), file);
+		results.push({ path: relativeFilePath, name: file.name });
+	}
+
+	return c.json({ ok: true, files: results });
 }
 
 //

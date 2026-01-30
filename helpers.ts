@@ -61,46 +61,37 @@ export function getRequiredEnvVars<const T extends readonly string[]>(keys: T) {
 }
 
 /**
- * Generates a public API key for a user: `userId` plus an HMAC-SHA256 signature in base64url.
+ * Generates a public key for a username: `username` plus an HMAC-SHA256 signature in base64url.
  *
- * @param userId - The user identifier (e.g. username).
+ * @param username - The username to bind the key to.
  * @param secret - Server-side secret used to sign the key.
- * @returns A string in the form `userId.<signature>`.
+ * @returns A string in the form `username.<signature>`.
  */
-export function generatePublicKey(userId: string, secret: string): string {
-	const hmac = crypto
-		.createHmac("sha256", secret)
-		.update(userId)
-		.digest("base64url");
+export function generatePublicKey(username: string, secret: string): string {
+	const hmac = crypto.createHmac("sha256", secret).update(username).digest("base64url");
 
-	return `${userId}.${hmac}`;
+	return `${username}.${hmac}`;
 }
 
 /**
  * Verifies a public key produced by {@link generatePublicKey}.
  *
- * @param pbKey - The key to verify (format: `userId.<signature>`).
+ * @param pbKey - The key to verify (format: `username.<signature>`).
  * @param secret - The server-side secret used to verify the signature.
- * @returns The `userId` if the key is valid, or `null` if invalid or malformed.
+ * @returns The `username` if the key is valid, or `null` if invalid or malformed.
  */
 export function verifyPublicKey(pbKey: string, secret: string): string | null {
-	const [userId, signature] = pbKey.split(".");
+	const [username, signature] = pbKey.split(".");
 
-	if (!userId || !signature) return null;
+	if (!username || !signature) return null;
 
 	try {
-		const expected = crypto
-			.createHmac("sha256", secret)
-			.update(userId)
-			.digest("base64url");
+		const expected = crypto.createHmac("sha256", secret).update(username).digest("base64url");
 
 		// constant-time compare
-		const ok = crypto.timingSafeEqual(
-			Buffer.from(signature),
-			Buffer.from(expected),
-		);
+		const ok = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
 
-		return ok ? userId : null;
+		return ok ? username : null;
 	} catch (err) {
 		console.log(err);
 		return null;
