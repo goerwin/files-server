@@ -1,45 +1,60 @@
-import { config } from "dotenv";
+import { Hono } from "hono";
+import {
+	dirExists,
+	getRequiredEnvVars,
+	parsePath,
+	verifyPublicKey,
+} from "./helpers";
 
-// Load .env from cwd if present (optional; Bun also auto-loads when run via bun)
-config();
+const { DATABASES_FOLDER_PATH, PORT, SECRET_KEY } = getRequiredEnvVars([
+	"PORT",
+	"SECRET_KEY",
+	"DATABASES_FOLDER_PATH",
+]);
 
-const REQUIRED_ENV_KEYS = ["PORT", "SECRET_KEY"];
-
-function requireEnv(keys: string[]): void {
-	const missing = keys.filter((key) => {
-		const value = process.env[key];
-		return value === undefined || value === "";
-	});
-
-	if (missing.length > 0) {
-		console.error("Missing required environment variables:");
-		for (const key of missing) console.error(`  - ${key}`);
-		process.exit(1);
-	}
+if (!(await dirExists(parsePath(DATABASES_FOLDER_PATH)))) {
+	console.error("Db path does not exist. Path:", DATABASES_FOLDER_PATH);
+	process.exit(1);
 }
 
-requireEnv(REQUIRED_ENV_KEYS);
+const app = new Hono();
 
-const port = Number(process.env.PORT);
-Bun.serve({
-	port,
-	async fetch(req) {
-		const url = new URL(req.url);
+/**
+ * Uploads the database file to the database folder path
+ */
+app.post("/db/:userId/:dbName", async function dbHandler(c) {
+	const maxFileSize = 10 * 1024 * 1024; // 10 MB
+	const { userId, dbName } = c.req.param();
+	const dbFileName = `${userId}-${dbName}`.trim();
+	const body = await c.req.parseBody();
+	const file = body.file;
 
-		if (url.pathname === "/hello" && req.method === "GET") {
-			return new Response("hello there!", {
-				headers: { "Content-Type": "text/plain" },
-			});
-		}
+  console.log('authorization', c.req.header("authorization"));
+	const pbKey = c.req.header("authorization")?.replace("PublicKey ", "");
 
-		const dbMatch = /^\/db\/([^/]+)\/([^/]+)\/([^/]+)\/?$/.exec(url.pathname);
-		if (dbMatch && req.method === "POST") {
-			const [, user, project, name] = dbMatch;
-      console.log(user, project, name);
-		}
+	if (!pbKey) return c.json({ ok: false, error: "No public key" }, 401);
 
-		return new Response("Not Found", { status: 404 });
-	},
+	const verifiedUserId = verifyPublicKey(pbKey, SECRET_KEY);
+
+	if (verifiedUserId !== userId)
+		return c.json({ ok: false, error: "Invalid public key" }, 401);
+
+	if (!(file instanceof File))
+		return c.json({ ok: false, error: "file is required" }, 400);
+
+	if (file.size > maxFileSize) {
+		const msg = `file too big. Max: ${maxFileSize} Bytes. Received: ${file.size}`;
+		return c.json({ ok: false, error: msg }, 413);
+	}
+
+	await Bun.write(parsePath(DATABASES_FOLDER_PATH, dbFileName), file);
+
+	return c.json({ ok: true, name: dbFileName });
 });
 
-console.log(`Server running at http://localhost:${port}`);
+//
+// Starts the server
+//
+const server = Bun.serve({ port: PORT, fetch: app.fetch });
+
+console.log(`🚀 Server running at http://${server.hostname}:${server.port}`);
