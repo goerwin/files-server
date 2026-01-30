@@ -34,6 +34,19 @@ bun run dev
 
 ## API
 
+### `GET /`
+
+Simple health/status check.
+
+- **Response:** `{ "ok": true, "status": "ok" }`
+
+### `GET /verify-public-key/:pbKey`
+
+Verifies a public key and returns whether it is valid and which username it belongs to.
+
+- **Params:** `pbKey` – the public key string (`username.<signature>`).
+- **Response:** `{ "verified": boolean, "username": string | null }`
+
 ### `POST /files/:username`
 
 Uploads one or more files for `username` into that user’s folder.
@@ -54,14 +67,6 @@ curl -X POST "http://localhost:3000/files/alice/myfolder" \
   -H "Authorization: PublicKey alice.<signature>" \
   -F "files=@/path/to/file1.txt" \
   -F "files=@/path/to/file2.txt"
-```
-
-To set a custom filename at upload time, use curl’s `filename=` parameter (this becomes `file.name` on the server):
-
-```bash
-curl -X POST "http://localhost:3000/files/alice/myfolder" \
-  -H "Authorization: PublicKey alice.<signature>" \
-  -F "files=@/path/to/local.db;filename=production.db"
 ```
 
 ## Public keys

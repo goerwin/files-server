@@ -14,6 +14,18 @@ if (!(await dirExists(parsePath(FILES_FOLDER_PATH)))) {
 
 const app = new Hono();
 
+// Home page
+app.get("/", async function handler(c) {
+	return c.json({ ok: true, status: "ok" });
+});
+
+// Verifies the public key
+app.get("/verify-public-key/:pbKey", async function handler(c) {
+	const { pbKey } = c.req.param();
+	const verifiedUsername = verifyPublicKey(pbKey, SECRET_KEY);
+	return c.json({ verified: Boolean(verifiedUsername), username: verifiedUsername });
+});
+
 // Uploads the files to the users' [username] folder in the files folder
 app.post("/files/:username", filesHandler);
 
@@ -31,8 +43,8 @@ async function filesHandler(c: Context) {
 	const pbKey = c.req.header("authorization")?.replace("PublicKey ", "");
 	if (!pbKey) return c.json({ ok: false, error: "No public key" }, 401);
 
-	const verifiedUserId = verifyPublicKey(pbKey, SECRET_KEY);
-	if (verifiedUserId !== username) return c.json({ ok: false, error: "Invalid public key" }, 401);
+	const verifiedUsername = verifyPublicKey(pbKey, SECRET_KEY);
+	if (verifiedUsername !== username) return c.json({ ok: false, error: "Invalid public key" }, 401);
 
 	const reqFiles = (await c.req.formData()).getAll("files");
 	const files = reqFiles.filter((f) => f instanceof File);
