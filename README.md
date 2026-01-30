@@ -18,10 +18,10 @@ Create a `.env` file in the project root with:
 | ------------------- | --------------------------------------------------------------------- |
 | `PORT`              | Server port (e.g. `3000`)                                             |
 | `SECRET_KEY`        | Secret used to sign and verify public keys (keep private)             |
-| `FILES_FOLDER_PATH` | Directory where uploaded files are stored (supports `~` for home dir) |
+| `FILES_FOLDER_PATH` | Folder where uploaded files are stored (supports `~` for home dir) |
 
 The server will not start if any of these environment variables are not available at runtime.
-The files folder path must already exist.
+The folder at `FILES_FOLDER_PATH` must already exist.
 
 ## Running the server
 
@@ -38,22 +38,17 @@ bun run dev
 
 Simple health/status check.
 
-- **Response:** `{ "ok": true, "status": "ok" }`
-
 ### `GET /verify-public-key/:pbKey`
 
 Verifies a public key and returns whether it is valid and which username it belongs to.
 
-- **Params:** `pbKey` – the public key string (`username.<signature>`).
-- **Response:** `{ "verified": boolean, "username": string | null }`
-
 ### `POST /files/:username`
 
-Uploads one or more files for `username` into that user’s folder.
+Uploads one or more files for `username` into that user's folder.
 
 ### `POST /files/:username/:folder`
 
-Uploads one or more files for `username` into the user’s `folder` subfolder.
+Uploads one or more files for `username` into the user's `folder` subfolder.
 
 - **Authentication:** `Authorization: PublicKey <key>` header. The key must be generated for the same `username` as in the URL (see [Public keys](#public-keys)).
 - **Body:** multipart form with one or more `files` fields.
