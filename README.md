@@ -14,11 +14,9 @@ bun install
 
 Create a `.env` file in the project root with:
 
-| Variable            | Description                                                           |
-| ------------------- | --------------------------------------------------------------------- |
-| `PORT`              | Server port (e.g. `3000`)                                             |
-| `SECRET_KEY`        | Secret used to sign and verify public keys (keep private)             |
-| `FILES_FOLDER_PATH` | Folder where uploaded files are stored (supports `~` for home dir) |
+- **`PORT`**: Server port (e.g. `3000`)
+- **`SECRET_KEY`**: Secret used to sign and verify public keys (keep private)
+- **`FILES_FOLDER_PATH`**: Folder where uploaded files are stored (supports `~` for home)
 
 The server will not start if any of these environment variables are not available at runtime.
 The folder at `FILES_FOLDER_PATH` must already exist.
